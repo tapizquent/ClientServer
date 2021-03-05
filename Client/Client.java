@@ -64,6 +64,13 @@ public class Client {
 
     public void processUpload() {
         try {
+            String uploadSignal = socketIn.readUTF();
+
+            if (uploadSignal.compareTo("ErrFileExists") == 0) {
+                System.out.println("** File already in server. Upload permission denied.");
+                return;
+            }
+
             FileInputStream fileInputStream = new FileInputStream("Files/" + filename);
             int totalFileByteSize = fileInputStream.available();
             int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : totalFileByteSize;

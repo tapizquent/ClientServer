@@ -59,15 +59,6 @@ public class Server {
 
                     percentageTransferred = 0;
 
-                    if (debugFlag == 1) {
-                        if (clientMode == 0) {
-                            System.out.println("Finished sending " + filename + " to " + connection.getInetAddress());
-                        } else {
-                            System.out
-                                    .println("Finished receiving " + filename + " from " + connection.getInetAddress());
-                        }
-                    }
-
                     System.out.println();
                 }
             }
@@ -91,11 +82,27 @@ public class Server {
         }
 
         fileIn.close();
+
+        if (debugFlag == 1) {
+            System.out.println("Finished sending " + filename + " to " + connection.getInetAddress());
+        }
     }
 
     private void processClientUpload() throws FileNotFoundException, IOException {
         try {
             File fileToWrite = new File("Files/" + filename);
+
+            if (fileToWrite.exists()) {
+                if (debugFlag == 1) {
+                    System.out.println("** File " + filename + " already exists. Aborting upload.");
+                }
+
+                socketOut.writeUTF("ErrFileExists");
+                return;
+            } else {
+                socketOut.writeUTF("OkToWrite");
+            }
+
             fileOut = new FileOutputStream(fileToWrite);
 
             // Read file contents from server
@@ -109,6 +116,10 @@ public class Server {
             }
 
             fileOut.close();
+
+            if (debugFlag == 1) {
+                System.out.println("Finished receiving " + filename + " from " + connection.getInetAddress());
+            }
         } catch (Exception e) {
             System.out.println("ERROR: Could not read file");
         }
