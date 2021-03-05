@@ -42,8 +42,6 @@ public class Server {
                     int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : totalFileByteSize;
                     buffer = new byte[bufferSize];
 
-                    System.out.println("Size of file being sent: " + totalFileByteSize);
-
                     // Write file contents to client
                     while (true) {
                         bytes = fileIn.read(buffer, 0, bufferSize); // Read from file
@@ -51,8 +49,6 @@ public class Server {
                             break; // Check for end of file
                         socketOut.write(buffer, 0, bytes); // Write bytes to socket
                         printTransferProgress(totalFileByteSize, fileIn.available());
-                        // Log.i("TOTAL", Long.toString(total));
-                        // Log.i("Upload progress", "" + (int) ((total * 100) / buffer.length));
                     }
                 } catch (Exception ex) {
                     System.out.println("Error: " + ex);
@@ -100,7 +96,35 @@ public class Server {
     }
 
     public static void main(String[] args) {
-        int debugFlag = args.length > 0 ? Integer.parseInt(args[0]) : 0;
-        Server server = new Server(5000, debugFlag);
+        try {
+            int debugFlag = parseCommandLineArgument(args);
+            Server server = new Server(5000, debugFlag);
+        } catch (InvalidArgumentException e) {
+            System.out.println("Invalid argument. Please run as:");
+            System.out.println();
+            System.out.println("  `java Server` or `java Server DEBUG=1`");
+        }
     }
+
+    public static int parseCommandLineArgument(String[] args) throws InvalidArgumentException {
+        if (args.length <= 0)
+            return 0;
+
+        String[] splitByEqual = args[0].split("=");
+
+        if (splitByEqual.length < 2) {
+            throw new InvalidArgumentException();
+        }
+
+        if (splitByEqual[0].compareTo("DEBUG") != 0 && splitByEqual[0].compareTo("debug") != 0) {
+            throw new InvalidArgumentException();
+        }
+
+        int debugFlag = args.length > 0 ? Integer.parseInt(splitByEqual[1]) : 0;
+        return debugFlag;
+    }
+}
+
+class InvalidArgumentException extends Exception {
+    private static final long serialVersionUID = 1L;
 }
