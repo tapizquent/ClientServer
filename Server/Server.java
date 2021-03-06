@@ -67,18 +67,40 @@ public class Server {
         }
     }
 
+    private long totalBytesTransferred = 0;
+
     private void processClientDownload() throws IOException, FileNotFoundException {
+        long skipItems = socketIn.readLong();
+        long endByteIndex = socketIn.readLong();
+        long lengthOfBytesToRead = endByteIndex - skipItems;
         fileIn = new FileInputStream("Files/" + filename);
-        int totalFileByteSize = fileIn.available();
-        int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : totalFileByteSize;
+        fileIn.skip(skipItems);
+        long totalFileByteSize = fileIn.available();
+
+        if (endByteIndex > 0) {
+            if (totalFileByteSize > lengthOfBytesToRead) {
+                totalFileByteSize = lengthOfBytesToRead;
+            }
+        }
+
+        int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : (int) totalFileByteSize;
+
         buffer = new byte[bufferSize];
 
         while (true) {
             bytes = fileIn.read(buffer, 0, bufferSize); // Read from file
+            totalBytesTransferred += bytes;
+
             if (bytes <= 0)
                 break; // Check for end of file
+
             socketOut.write(buffer, 0, bytes); // Write bytes to socket
-            printTransferProgress(totalFileByteSize, fileIn.available());
+            printTransferProgress(totalFileByteSize, totalFileByteSize - totalBytesTransferred);
+
+            if (totalBytesTransferred >= totalFileByteSize) {
+                totalBytesTransferred = 0;
+                break;
+            }
         }
 
         fileIn.close();
@@ -121,7 +143,7 @@ public class Server {
                 System.out.println("Finished receiving " + filename + " from " + connection.getInetAddress());
             }
         } catch (Exception e) {
-            System.out.println("ERROR: Could not read file");
+            System.out.println("ERROR: Could not read file. " + e.getLocalizedMessage());
         }
     }
 

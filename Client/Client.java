@@ -14,6 +14,8 @@ public class Client {
     private File fileToWrite;
     private static String filename = "";
     private static ClientMode clientMode = ClientMode.read;
+    private static long startByteIndex = -1;
+    private static long endByteIndex = -1;
 
     public Client(String host, int port, String filename) {
         try {
@@ -45,6 +47,11 @@ public class Client {
     public void processDownload() {
         try {
             OutputStream os = new FileOutputStream(fileToWrite);
+
+            long skipItems = startByteIndex < 0 ? 0 : startByteIndex - 1;
+
+            socketOut.writeLong(skipItems);
+            socketOut.writeLong(endByteIndex);
 
             // Read file contents from server
             while (true) {
@@ -114,6 +121,34 @@ public class Client {
             clientMode = ClientMode.write;
         } else {
             filename = args[0];
+
+            if (args.length < 2) {
+                return;
+            }
+
+            if (args[1].compareTo("-s") == 0) {
+                if (args.length < 3) {
+                    throw new InvalidArgumentException(ArgumentErrorCode.startByte);
+                }
+
+                startByteIndex = Long.parseLong(args[2]);
+            }
+
+            if (args.length < 4) {
+                return;
+            }
+
+            if (args[3].compareTo("-e") == 0) {
+                if (args.length < 5) {
+                    throw new InvalidArgumentException(ArgumentErrorCode.endByte);
+                }
+
+                endByteIndex = Long.parseLong(args[4]);
+
+                if (startByteIndex > endByteIndex) {
+                    throw new InvalidArgumentException(ArgumentErrorCode.startIndexAfterEnd);
+                }
+            }
         }
     }
 
@@ -127,6 +162,12 @@ public class Client {
                 break;
             case startByte:
                 System.out.println("ERROR: START BYTE VALUE MISSING");
+                break;
+            case endByte:
+                System.out.println("ERROR: END BYTE VALUE MISSING");
+                break;
+            case startIndexAfterEnd:
+                System.out.println("ERROR: END BYTE INDEX CANNOT BE LESS THAN START BYTE INDEX");
                 break;
             default:
                 System.out.println("ERROR: INVALID ARGUMENT");
@@ -159,7 +200,7 @@ class InvalidArgumentException extends Exception {
 }
 
 enum ArgumentErrorCode {
-    filename, startByte, missingAll
+    filename, startByte, endByte, missingAll, startIndexAfterEnd
 }
 
 enum ClientMode {
