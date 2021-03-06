@@ -34,19 +34,7 @@ public class Server {
                     clientMode = socketIn.readInt(); // Read clientMode from Client
                     filename = socketIn.readUTF(); // Read filename from client
 
-                    if (debugFlag == 1) {
-                        if (clientMode == 0) {
-                            System.out.println("Sending " + filename + " to " + connection.getInetAddress());
-                        } else {
-                            System.out.println("Receiving " + filename + " from " + connection.getInetAddress());
-                        }
-                    }
-
-                    if (clientMode == 0) {
-                        processClientDownload();
-                    } else {
-                        processClientUpload();
-                    }
+                    processClientRequest(debugFlag);
 
                 } catch (Exception ex) {
                     System.out.println("Error: " + ex);
@@ -64,6 +52,22 @@ public class Server {
             }
         } catch (IOException i) {
             System.out.println("Error: " + i);
+        }
+    }
+
+    private void processClientRequest(int debugFlag) throws IOException, FileNotFoundException {
+        if (debugFlag == 1) {
+            if (clientMode == 0) {
+                System.out.println("Sending " + filename + " to " + connection.getInetAddress());
+            } else {
+                System.out.println("Receiving " + filename + " from " + connection.getInetAddress());
+            }
+        }
+
+        if (clientMode == 0) {
+            processClientDownload();
+        } else {
+            processClientUpload();
         }
     }
 
@@ -86,6 +90,7 @@ public class Server {
         long skipItems = socketIn.readLong();
         long endByteIndex = socketIn.readLong();
         long lengthOfBytesToRead = endByteIndex - skipItems;
+        System.out.println("Length of bytes to downlaod: " + lengthOfBytesToRead);
         fileIn = new FileInputStream(fileInFiles);
         fileIn.skip(skipItems);
         long totalFileByteSize = fileIn.available();
@@ -108,6 +113,10 @@ public class Server {
         buffer = new byte[bufferSize];
 
         while (true) {
+            if (bufferSize > (totalFileByteSize - totalBytesTransferred)) {
+                bufferSize = (int) (totalFileByteSize - totalBytesTransferred);
+            }
+
             bytes = fileIn.read(buffer, 0, bufferSize); // Read from file
             totalBytesTransferred += bytes;
 
@@ -165,6 +174,9 @@ public class Server {
         } catch (Exception e) {
             System.out.println("ERROR: Could not read file. " + e.getLocalizedMessage());
         }
+    }
+
+    private void processHTTPGetRequest() {
     }
 
     private void printTransferProgress(long totalBytes, long bytesLeft) {

@@ -173,6 +173,12 @@ public class Client {
                 }
 
                 startByteIndex = Long.parseLong(args[2]);
+
+                if (startByteIndex < 1) {
+                    throw new InvalidArgumentException(ArgumentErrorCode.startByteIndexLessThan1);
+                }
+            } else {
+                throw new InvalidArgumentException(ArgumentErrorCode.invalid);
             }
 
             if (args[3].compareTo("-e") == 0) {
@@ -182,9 +188,15 @@ public class Client {
 
                 endByteIndex = Long.parseLong(args[4]);
 
+                if (endByteIndex < 1) {
+                    throw new InvalidArgumentException(ArgumentErrorCode.endByteIndexLessThan1);
+                }
+
                 if (startByteIndex > endByteIndex) {
                     throw new InvalidArgumentException(ArgumentErrorCode.startIndexAfterEnd);
                 }
+            } else {
+                throw new InvalidArgumentException(ArgumentErrorCode.invalid);
             }
         }
     }
@@ -202,6 +214,12 @@ public class Client {
                 break;
             case endByte:
                 System.out.println("ERROR: END BYTE VALUE MISSING");
+                break;
+            case startByteIndexLessThan1:
+                System.out.println("ERROR: START BYTE INDEX MUST BE GREATER THAN 0");
+                break;
+            case endByteIndexLessThan1:
+                System.out.println("ERROR: END BYTE INDEX MUST BE GREATER THAN 0");
                 break;
             case startIndexAfterEnd:
                 System.out.println("ERROR: END BYTE INDEX CANNOT BE LESS THAN START BYTE INDEX");
@@ -245,7 +263,8 @@ class InvalidArgumentException extends Exception {
 }
 
 enum ArgumentErrorCode {
-    filename, startByte, endByte, missingAll, startIndexAfterEnd
+    filename, startByte, endByte, missingAll, startIndexAfterEnd, startByteIndexLessThan1, endByteIndexLessThan1,
+    invalid
 }
 
 enum ClientMode {
