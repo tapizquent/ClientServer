@@ -78,8 +78,15 @@ public class Server {
         long totalFileByteSize = fileIn.available();
 
         if (endByteIndex > 0) {
-            if (totalFileByteSize > lengthOfBytesToRead) {
+            if (totalFileByteSize >= lengthOfBytesToRead) {
                 totalFileByteSize = lengthOfBytesToRead;
+                socketOut.writeUTF("OkToRead");
+            } else {
+                if (debugFlag == 1) {
+                    System.out.println("** Invalid byte range specified. More bytes requested than available in file");
+                }
+                socketOut.writeUTF("ErrInvalidByteRange");
+                return;
             }
         }
 

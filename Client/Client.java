@@ -46,13 +46,20 @@ public class Client {
 
     public void processDownload() {
         try {
-            OutputStream os = new FileOutputStream(fileToWrite);
 
             long skipItems = startByteIndex < 0 ? 0 : startByteIndex - 1;
 
             socketOut.writeLong(skipItems);
             socketOut.writeLong(endByteIndex);
 
+            String downloadSignal = socketIn.readUTF();
+
+            if (downloadSignal.compareTo("ErrInvalidByteRange") == 0) {
+                System.out.println("** Invalid byte range specified. More bytes requested than available in file");
+                return;
+            }
+
+            OutputStream os = new FileOutputStream(fileToWrite);
             // Read file contents from server
             while (true) {
                 bytes = socketIn.read(buffer, 0, BUFFER_SIZE); // Read from socket
