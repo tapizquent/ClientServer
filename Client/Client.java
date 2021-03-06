@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -19,47 +20,62 @@ public class Client {
 
     public Client(String host, int port, String filename) {
         try {
-            connection = new Socket(host, port);
-
-            socketIn = new DataInputStream(connection.getInputStream()); // Read data from server
-            socketOut = new DataOutputStream(connection.getOutputStream()); // Write data to server
-
             if (clientMode == ClientMode.write) {
-                // Write flag to let server know whether to upload or download
-                socketOut.writeInt(1);
-                socketOut.writeUTF(filename); // Write filename to server
-                fileToWrite = new File("Files/" + filename);
-                processUpload();
+                processUpload(host, port, filename);
             } else {
-                // Write flag to let server know whether to upload or download
-                socketOut.writeInt(0);
-                socketOut.writeUTF(filename); // Write filename to server
-                fileToWrite = new File("Files/" + filename);
-                processDownload();
+                processDownload(host, port, filename);
             }
 
-            connection.close();
+            if (connection != null) {
+                connection.close();
+            }
         } catch (Exception ex) {
-            System.out.println("Error: " + ex);
+            System.out.println("Error: " + ex.getLocalizedMessage());
         }
     }
 
-    public void processDownload() {
+    private void establishConnection(String host, int port) throws UnknownHostException, IOException {
         try {
+            connection = new Socket(host, port);
+            socketIn = new DataInputStream(connection.getInputStream()); // Read data from server
+            socketOut = new DataOutputStream(connection.getOutputStream());
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getLocalizedMessage());
+        }
+    }
+
+    public void processDownload(String host, int port, String filename) {
+        try {
+            establishConnection(host, port);
+
+            socketOut.writeInt(0); // Set client in write mode
+            socketOut.writeUTF(filename); // Write filename to server
+
+            String fileExistFlag = socketIn.readUTF();
+
+            if (fileExistFlag.compareTo("ErrFileDoesNotExist") == 0) {
+                System.out.println("** File with name: " + filename + " does not exist in server.");
+                return;
+            }
+
+            fileToWrite = new File("Files/" + filename);
 
             long skipItems = startByteIndex < 0 ? 0 : startByteIndex - 1;
 
             socketOut.writeLong(skipItems);
             socketOut.writeLong(endByteIndex);
 
-            String downloadSignal = socketIn.readUTF();
+            if (endByteIndex > 0) {
+                String byteIndexDownloadSignal = socketIn.readUTF();
 
-            if (downloadSignal.compareTo("ErrInvalidByteRange") == 0) {
-                System.out.println("** Invalid byte range specified. More bytes requested than available in file");
-                return;
+                if (byteIndexDownloadSignal.compareTo("ErrInvalidByteRange") == 0) {
+                    System.out.println("** Invalid byte range specified");
+                    return;
+                }
             }
 
             OutputStream os = new FileOutputStream(fileToWrite);
+
             // Read file contents from server
             while (true) {
                 bytes = socketIn.read(buffer, 0, BUFFER_SIZE); // Read from socket
@@ -73,11 +89,25 @@ public class Client {
             os.close();
         } catch (Exception e) {
             System.out.println("ERROR: Could not read file");
+            System.out.println(e);
         }
     }
 
-    public void processUpload() {
+    public void processUpload(String host, int port, String filename) {
         try {
+            File fileToUpload = new File("Files/" + filename);
+
+            if (!fileToUpload.exists()) {
+                System.out.println("** File with name: " + filename + " does not exist.");
+                System.out.println("   Please ensure file is in Files/ directory of Client");
+                return;
+            }
+
+            establishConnection(host, port);
+
+            socketOut.writeInt(1);
+            socketOut.writeUTF(filename); // Write filename to server
+
             String uploadSignal = socketIn.readUTF();
 
             if (uploadSignal.compareTo("ErrFileExists") == 0) {
@@ -85,7 +115,7 @@ public class Client {
                 return;
             }
 
-            FileInputStream fileInputStream = new FileInputStream("Files/" + filename);
+            FileInputStream fileInputStream = new FileInputStream(fileToUpload);
             int totalFileByteSize = fileInputStream.available();
             int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : totalFileByteSize;
             buffer = new byte[bufferSize];
@@ -133,16 +163,16 @@ public class Client {
                 return;
             }
 
+            if (args.length < 5) {
+                throw new InvalidArgumentException(ArgumentErrorCode.missingAll);
+            }
+
             if (args[1].compareTo("-s") == 0) {
                 if (args.length < 3) {
                     throw new InvalidArgumentException(ArgumentErrorCode.startByte);
                 }
 
                 startByteIndex = Long.parseLong(args[2]);
-            }
-
-            if (args.length < 4) {
-                return;
             }
 
             if (args[3].compareTo("-e") == 0) {
@@ -184,12 +214,20 @@ public class Client {
         System.out.println();
         System.out.println("Please use as follows:");
         System.out.println();
-        System.out.println("  java Client [-w] <filename> [-s <startByte>] [-e <endByte>]");
+        System.out.println("  `java Client [-w] <filename> [-s <startByteIndex> -e <endByteIndex>]`");
+        System.out.println();
+        System.out.println("  ============================================================");
         System.out.println();
         System.out.println("  <filename> : Required whether reading or writting file");
-        System.out.println("  -w : Sets Client in write mode. File with <filename> will upload to Server");
-        System.out.println("  -s : Sets the start byte to copy file (if whole file is not needed)");
-        System.out.println("  -e : Sets the end byte to copy file (if whole file is not needed)");
+        System.out.println();
+        System.out.println("  -w : Sets Client in write mode. File with <filename> will upload to Server.");
+        System.out.println("       File to upload must be in Files/ directory of Client");
+        System.out.println();
+        System.out.println("  Download only:");
+        System.out.println("  -s : Sets the start byte index to copy file (if whole file is not needed)");
+        System.out.println("  -e : Sets the end byte index to copy file (if whole file is not needed)");
+        System.out.println();
+        System.out.println("  NOTE: If start byte provided, end byte must also be provided");
     }
 }
 

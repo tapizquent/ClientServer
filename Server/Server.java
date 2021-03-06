@@ -70,10 +70,23 @@ public class Server {
     private long totalBytesTransferred = 0;
 
     private void processClientDownload() throws IOException, FileNotFoundException {
+        File fileInFiles = new File("Files/" + filename);
+
+        if (!fileInFiles.exists()) {
+            if (debugFlag == 1) {
+                System.out.println("** File with name: " + filename + " does not exist.");
+                System.out.println("   Please ensure file is in Files/ directory of Server");
+            }
+            socketOut.writeUTF("ErrFileDoesNotExist");
+            return;
+        } else {
+            socketOut.writeUTF("OkToRead");
+        }
+
         long skipItems = socketIn.readLong();
         long endByteIndex = socketIn.readLong();
         long lengthOfBytesToRead = endByteIndex - skipItems;
-        fileIn = new FileInputStream("Files/" + filename);
+        fileIn = new FileInputStream(fileInFiles);
         fileIn.skip(skipItems);
         long totalFileByteSize = fileIn.available();
 
@@ -83,7 +96,7 @@ public class Server {
                 socketOut.writeUTF("OkToRead");
             } else {
                 if (debugFlag == 1) {
-                    System.out.println("** Invalid byte range specified. More bytes requested than available in file");
+                    System.out.println("** Invalid byte range specified");
                 }
                 socketOut.writeUTF("ErrInvalidByteRange");
                 return;
@@ -174,7 +187,9 @@ public class Server {
             int debugFlag = parseCommandLineArgument(args);
             Server server = new Server(5000, debugFlag);
         } catch (InvalidArgumentException e) {
-            System.out.println("Invalid argument. Please run as:");
+            System.out.println("ERROR: INVALID ARGUMENTS");
+            System.out.println();
+            System.out.println("Please run as:");
             System.out.println();
             System.out.println("  `java Server` or `java Server DEBUG=1`");
         }
