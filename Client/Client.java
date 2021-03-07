@@ -48,7 +48,7 @@ public class Client {
         try {
             establishConnection(host, port);
 
-            socketOut.writeInt(0); // Set client in write mode
+            socketOut.writeUTF("0\n"); // Set client in write mode
             socketOut.writeUTF(filename); // Write filename to server
 
             String fileExistFlag = socketIn.readUTF();
@@ -105,7 +105,7 @@ public class Client {
 
             establishConnection(host, port);
 
-            socketOut.writeInt(1);
+            socketOut.writeUTF("1\n");
             socketOut.writeUTF(filename); // Write filename to server
 
             String uploadSignal = socketIn.readUTF();

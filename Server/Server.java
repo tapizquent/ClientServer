@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.net.Socket;
 
 public class Server {
@@ -27,14 +28,20 @@ public class Server {
             while (true) {
                 try {
                     connection = socket.accept(); // Block for connection request
-
                     socketIn = new DataInputStream(connection.getInputStream()); // Read data from client
-                    socketOut = new DataOutputStream(connection.getOutputStream()); // Write data to client
 
-                    clientMode = socketIn.readInt(); // Read clientMode from Client
-                    filename = socketIn.readUTF(); // Read filename from client
+                    @SuppressWarnings("deprecation")
+                    String request = socketIn.readLine(); // Now you get GET index.html HTTP/1.1
 
-                    processClientRequest(debugFlag);
+                    if (request.trim().length() == 1) {
+                        clientMode = request.contains("0") ? 0 : 1;
+                        socketOut = new DataOutputStream(connection.getOutputStream()); // Write data to client
+                        processClientRequest(debugFlag);
+                    } else {
+                        String[] requestParam = request.split(" ");
+                        String path = requestParam[1];
+                        processHTTPGetRequest(path);
+                    }
 
                 } catch (Exception ex) {
                     System.out.println("Error: " + ex);
@@ -56,6 +63,7 @@ public class Server {
     }
 
     private void processClientRequest(int debugFlag) throws IOException, FileNotFoundException {
+        filename = socketIn.readUTF(); // Read filename from client
         if (debugFlag == 1) {
             if (clientMode == 0) {
                 System.out.println("Sending " + filename + " to " + connection.getInetAddress());
@@ -63,7 +71,6 @@ public class Server {
                 System.out.println("Receiving " + filename + " from " + connection.getInetAddress());
             }
         }
-
         if (clientMode == 0) {
             processClientDownload();
         } else {
@@ -90,7 +97,6 @@ public class Server {
         long skipItems = socketIn.readLong();
         long endByteIndex = socketIn.readLong();
         long lengthOfBytesToRead = endByteIndex - skipItems;
-        System.out.println("Length of bytes to downlaod: " + lengthOfBytesToRead);
         fileIn = new FileInputStream(fileInFiles);
         fileIn.skip(skipItems);
         long totalFileByteSize = fileIn.available();
@@ -172,11 +178,53 @@ public class Server {
                 System.out.println("Finished receiving " + filename + " from " + connection.getInetAddress());
             }
         } catch (Exception e) {
+            System.out.println("ERROR: Could not read file. " + e);
             System.out.println("ERROR: Could not read file. " + e.getLocalizedMessage());
         }
     }
 
-    private void processHTTPGetRequest() {
+    private void processHTTPGetRequest(String path) {
+        try {
+            PrintStream out = new PrintStream(connection.getOutputStream(), true);
+
+            if (path.equals("/")) {
+                out.println("HTTP/1.1 404 Not Found");
+                out.println("Content-Type: text/html");
+                out.println();
+                return;
+            }
+
+            File file = new File("Files/" + path);
+
+            if (!file.exists()) {
+                if (debugFlag == 1) {
+                    System.out.println("File not in server: " + path);
+                }
+
+                out.println("HTTP/1.1 404 Not Found");
+                out.println("Content-Type: text/html");
+                out.println();
+                return; // the file does not exist
+            }
+
+            FileReader fr = new FileReader(file);
+            BufferedReader bfr = new BufferedReader(fr);
+            String line;
+            out.println("HTTP/1.1 200 OK");
+            out.println("Content-Length: " + file.length());
+            out.println("Content-Type: text/html");
+            out.println("Connection: Closed");
+            out.println();
+            while ((line = bfr.readLine()) != null) {
+                out.println(line);
+            }
+
+            bfr.close();
+            out.close();
+        } catch (Exception e) {
+            System.out.print("** ERROR: Can't access outputStream");
+            System.out.print("   " + e);
+        }
     }
 
     private void printTransferProgress(long totalBytes, long bytesLeft) {
