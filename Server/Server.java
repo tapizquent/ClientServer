@@ -2,11 +2,74 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.net.Socket;
+import java.util.concurrent.*;
 
 public class Server {
-    private final int BUFFER_SIZE = 4096;
     private Socket connection;
     private ServerSocket socket;
+    private ExecutorService executorService;
+
+    public Server(int port, int debugFlag) {
+        executorService = Executors.newCachedThreadPool();
+
+        try {
+            socket = new ServerSocket(port);
+            // Wait for connection and process it
+            while (true) {
+                try {
+                    connection = socket.accept(); // Block for connection request
+                    executorService.execute(new ConnectionManager(connection, debugFlag));
+
+                } catch (Exception ex) {
+                    System.out.println("Error: " + ex);
+                }
+            }
+        } catch (IOException i) {
+            System.out.println("Error: " + i);
+        }
+
+        executorService.shutdown();
+    }
+
+    public static void main(String[] args) {
+        try {
+            int debugFlag = parseCommandLineArgument(args);
+            Server server = new Server(5000, debugFlag);
+        } catch (InvalidArgumentException e) {
+            System.out.println("ERROR: INVALID ARGUMENTS");
+            System.out.println();
+            System.out.println("Please run as:");
+            System.out.println();
+            System.out.println("  `java Server` or `java Server DEBUG=1`");
+        }
+    }
+
+    public static int parseCommandLineArgument(String[] args) throws InvalidArgumentException {
+        if (args.length <= 0)
+            return 0;
+
+        String[] splitByEqual = args[0].split("=");
+
+        if (splitByEqual.length < 2) {
+            throw new InvalidArgumentException();
+        }
+
+        if (splitByEqual[0].compareTo("DEBUG") != 0 && splitByEqual[0].compareTo("debug") != 0) {
+            throw new InvalidArgumentException();
+        }
+
+        int debugFlag = args.length > 0 ? Integer.parseInt(splitByEqual[1]) : 0;
+        return debugFlag;
+    }
+}
+
+class InvalidArgumentException extends Exception {
+    private static final long serialVersionUID = 1L;
+}
+
+class ConnectionManager implements Runnable {
+    private Socket connection;
+    private final int BUFFER_SIZE = 4096;
     private DataInputStream socketIn;
     private DataOutputStream socketOut;
     private FileInputStream fileIn;
@@ -20,45 +83,37 @@ public class Server {
     // Client mode 1 = WRITE
     private int clientMode = 0;
 
-    public Server(int port, int debugFlag) {
+    public ConnectionManager(Socket serverSocket, int debugFlag) {
+        connection = serverSocket;
         this.debugFlag = debugFlag;
+    }
+
+    public void run() {
         try {
-            socket = new ServerSocket(port);
-            // Wait for connection and process it
-            while (true) {
-                try {
-                    connection = socket.accept(); // Block for connection request
-                    socketIn = new DataInputStream(connection.getInputStream()); // Read data from client
+            try {
+                socketIn = new DataInputStream(connection.getInputStream()); // Read data from client
 
-                    @SuppressWarnings("deprecation")
-                    String request = socketIn.readLine(); // Now you get GET index.html HTTP/1.1
+                @SuppressWarnings("deprecation")
+                String request = socketIn.readLine(); // Now you get GET index.html HTTP/1.1
 
-                    if (request.trim().length() == 1) {
-                        clientMode = request.contains("0") ? 0 : 1;
-                        socketOut = new DataOutputStream(connection.getOutputStream()); // Write data to client
-                        processClientRequest(debugFlag);
-                    } else {
-                        String[] requestParam = request.split(" ");
-                        String path = requestParam[1];
-                        processHTTPGetRequest(path);
-                    }
-
-                } catch (Exception ex) {
-                    System.out.println("Error: " + ex);
-                    System.out.println("filename: " + filename);
-                } finally {
-                    // Clean up socket and file streams
-                    if (connection != null) {
-                        connection.close();
-                    }
-
-                    percentageTransferred = 0;
-
-                    System.out.println();
+                if (request.trim().length() == 1) {
+                    clientMode = request.contains("0") ? 0 : 1;
+                    socketOut = new DataOutputStream(connection.getOutputStream()); // Write data to client
+                    processClientRequest(debugFlag);
+                } else {
+                    String[] requestParam = request.split(" ");
+                    String path = requestParam[1];
+                    processHTTPGetRequest(path);
                 }
+
+                System.out.println();
+            } catch (Exception e) {
+                System.out.println("ERROR: Error in ConnectionManager. " + e);
+            } finally {
+                connection.close();
             }
-        } catch (IOException i) {
-            System.out.println("Error: " + i);
+        } catch (Exception e) {
+            System.out.println("ERROR: Could not access socket.");
         }
     }
 
@@ -210,13 +265,14 @@ public class Server {
             FileReader fr = new FileReader(file);
             BufferedReader bfr = new BufferedReader(fr);
             String line;
-            out.println("HTTP/1.1 200 OK");
-            out.println("Content-Length: " + file.length());
-            out.println("Content-Type: text/html");
-            out.println("Connection: Closed");
+            out.println("HTTP/1.1 200 OK\r");
+            out.println("Content-Type: text/html\r");
+            out.println("Content-Length: " + file.length() + "\r");
+            out.println("Connection: Closed\r");
+            out.println();
             out.println();
             while ((line = bfr.readLine()) != null) {
-                out.println(line);
+                out.println(line + "\r");
             }
 
             bfr.close();
@@ -241,39 +297,4 @@ public class Server {
         percentageTransferred = roundedPercentage;
 
     }
-
-    public static void main(String[] args) {
-        try {
-            int debugFlag = parseCommandLineArgument(args);
-            Server server = new Server(5000, debugFlag);
-        } catch (InvalidArgumentException e) {
-            System.out.println("ERROR: INVALID ARGUMENTS");
-            System.out.println();
-            System.out.println("Please run as:");
-            System.out.println();
-            System.out.println("  `java Server` or `java Server DEBUG=1`");
-        }
-    }
-
-    public static int parseCommandLineArgument(String[] args) throws InvalidArgumentException {
-        if (args.length <= 0)
-            return 0;
-
-        String[] splitByEqual = args[0].split("=");
-
-        if (splitByEqual.length < 2) {
-            throw new InvalidArgumentException();
-        }
-
-        if (splitByEqual[0].compareTo("DEBUG") != 0 && splitByEqual[0].compareTo("debug") != 0) {
-            throw new InvalidArgumentException();
-        }
-
-        int debugFlag = args.length > 0 ? Integer.parseInt(splitByEqual[1]) : 0;
-        return debugFlag;
-    }
-}
-
-class InvalidArgumentException extends Exception {
-    private static final long serialVersionUID = 1L;
 }

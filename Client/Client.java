@@ -29,6 +29,7 @@ public class Client {
             if (connection != null) {
                 connection.close();
             }
+
         } catch (Exception ex) {
             System.out.println("Error: " + ex.getLocalizedMessage());
         }
