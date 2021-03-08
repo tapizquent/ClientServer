@@ -14,11 +14,24 @@ In order to run, first run the command:
     `make`
 from the Tapizquent_Jose directory
 
-Once the executables have been genenrated, run
+Once the executables have been generated, `cd` into the `Server/` directory and run
     `java Server` or `java Server DEBUG=1`
-from the Server directory
+from the Server directory to start the Server at port 5000
 
 Once the server is running, the Client can be run to upload or download files from the Server.
-To do this run
+To do this, `cd` into `Client/` directory and run
     `java Client <filename>` or `java Client -w <filename>`
 from the Client directory
+
+You can also run client as
+    `java Client <filename> -s <startByteIndex> -e <endByteIndex>` or `java Client -w <filename> -s <startByteIndex> -e <endByteIndex>`
+To only read or write files on a specify range of bytes only, if the whole file is not needed.
+
+# IMPORTANT REMARKS:
+
+Following the project description, the flags provided must be in the right order.
+That is, if writing from Client to Server, the `-w` flag must come before the `filename`
+
+In the same manner, when specifying start and end byte indexes, `-s` must come before `e` or the Client won't know how to interpret and will print out instructions on how to call client.
+
+NOTE: Please ensure both `-s` and `-e` are provided! If one of them is missing, it will print an error explaing that range is wrong.

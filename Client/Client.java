@@ -17,6 +17,7 @@ public class Client {
     private static ClientMode clientMode = ClientMode.read;
     private static long startByteIndex = -1;
     private static long endByteIndex = -1;
+    private static String serverName = "";
 
     public Client(String host, int port, String filename) {
         try {
@@ -116,17 +117,46 @@ public class Client {
                 return;
             }
 
+            long skipItems = startByteIndex < 0 ? 0 : startByteIndex - 1;
+            long lengthOfBytesToRead = endByteIndex - skipItems;
+
             FileInputStream fileInputStream = new FileInputStream(fileToUpload);
-            int totalFileByteSize = fileInputStream.available();
-            int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : totalFileByteSize;
+            long totalFileByteSize = fileToUpload.length();
+
+            if (endByteIndex > 0) {
+                if (totalFileByteSize >= lengthOfBytesToRead) {
+                    totalFileByteSize = lengthOfBytesToRead;
+                } else {
+                    System.out.println("** Invalid byte range specified");
+                    fileInputStream.close();
+                    return;
+                }
+            }
+
+            long totalBytesTransferred = 0;
+
+            fileInputStream.skip(skipItems);
+
+            int bufferSize = totalFileByteSize > BUFFER_SIZE ? BUFFER_SIZE : (int) totalFileByteSize;
             buffer = new byte[bufferSize];
 
             while (true) {
+                if (bufferSize > (totalFileByteSize - totalBytesTransferred)) {
+                    bufferSize = (int) (totalFileByteSize - totalBytesTransferred);
+                }
+
                 bytes = fileInputStream.read(buffer, 0, bufferSize); // Read from file
                 if (bytes <= 0)
                     break; // Check for end of file
+
+                totalBytesTransferred += bytes;
+
                 socketOut.write(buffer, 0, bytes); // Write bytes to socket
-                // printTransferProgress(totalFileByteSize, fileInputStream.available());
+
+                if (totalBytesTransferred >= totalFileByteSize) {
+                    totalBytesTransferred = 0;
+                    break;
+                }
             }
 
             fileInputStream.close();
@@ -138,111 +168,142 @@ public class Client {
     public static void main(String[] args) {
         try {
             parseCommandLineArguments(args);
-            Client client = new Client("127.0.0.1", 5000, filename);
+            Client client = new Client(serverName, 5000, filename);
         } catch (InvalidArgumentException e) {
             printConsoleHelp(e.getCode());
         }
     }
 
     public static void parseCommandLineArguments(String[] args) throws InvalidArgumentException {
-        if (args.length <= 0) {
+        if (args.length < 2) {
             throw new InvalidArgumentException(ArgumentErrorCode.missingAll);
         }
 
         // We are trying to access Client in Write mode
-        if (args[0].compareTo("-w") == 0) {
-            if (args.length < 2) {
+        if (args[1].compareTo("-w") == 0) {
+            if (args.length < 3) {
                 throw new InvalidArgumentException(ArgumentErrorCode.filename);
             }
 
-            filename = args[1];
+            serverName = args[0];
+            filename = args[2];
             clientMode = ClientMode.write;
+
+            setParamsFromArguments(args, true);
+
         } else {
-            filename = args[0];
+            serverName = args[0];
+            filename = args[1];
+            setParamsFromArguments(args, false);
+        }
+    }
 
-            if (args.length < 2) {
-                return;
+    public static void setParamsFromArguments(String[] args, Boolean isWriteMode) throws InvalidArgumentException {
+        int argsOffset = isWriteMode ? 2 : 1;
+
+        if (args.length < 2 + argsOffset) {
+            return;
+        }
+
+        if (args.length < 5 + argsOffset) {
+            throw new InvalidArgumentException(ArgumentErrorCode.missingAll);
+        }
+
+        if (args[1 + argsOffset].compareTo("-s") == 0) {
+            if (args.length < 3 + argsOffset) {
+                throw new InvalidArgumentException(ArgumentErrorCode.startByte);
             }
 
-            if (args.length < 5) {
-                throw new InvalidArgumentException(ArgumentErrorCode.missingAll);
+            try {
+                startByteIndex = Long.parseLong(args[2 + argsOffset]);
+            } catch (NumberFormatException e) {
+                throw new InvalidArgumentException(ArgumentErrorCode.invalidStartByteNumberParseFormat);
             }
 
-            if (args[1].compareTo("-s") == 0) {
-                if (args.length < 3) {
-                    throw new InvalidArgumentException(ArgumentErrorCode.startByte);
-                }
+            if (startByteIndex < 1) {
+                throw new InvalidArgumentException(ArgumentErrorCode.startByteIndexLessThan1);
+            }
+        } else {
+            throw new InvalidArgumentException(ArgumentErrorCode.invalid);
+        }
 
-                startByteIndex = Long.parseLong(args[2]);
-
-                if (startByteIndex < 1) {
-                    throw new InvalidArgumentException(ArgumentErrorCode.startByteIndexLessThan1);
-                }
-            } else {
-                throw new InvalidArgumentException(ArgumentErrorCode.invalid);
+        if (args[3 + argsOffset].compareTo("-e") == 0) {
+            if (args.length < 5 + argsOffset) {
+                throw new InvalidArgumentException(ArgumentErrorCode.endByte);
             }
 
-            if (args[3].compareTo("-e") == 0) {
-                if (args.length < 5) {
-                    throw new InvalidArgumentException(ArgumentErrorCode.endByte);
-                }
-
-                endByteIndex = Long.parseLong(args[4]);
-
-                if (endByteIndex < 1) {
-                    throw new InvalidArgumentException(ArgumentErrorCode.endByteIndexLessThan1);
-                }
-
-                if (startByteIndex > endByteIndex) {
-                    throw new InvalidArgumentException(ArgumentErrorCode.startIndexAfterEnd);
-                }
-            } else {
-                throw new InvalidArgumentException(ArgumentErrorCode.invalid);
+            try {
+                endByteIndex = Long.parseLong(args[4 + argsOffset]);
+            } catch (NumberFormatException e) {
+                throw new InvalidArgumentException(ArgumentErrorCode.invalidEndByteNumberParseFormat);
             }
+
+            if (endByteIndex < 1) {
+                throw new InvalidArgumentException(ArgumentErrorCode.endByteIndexLessThan1);
+            }
+
+            if (startByteIndex > endByteIndex) {
+                throw new InvalidArgumentException(ArgumentErrorCode.startIndexAfterEnd);
+            }
+        } else {
+            throw new InvalidArgumentException(ArgumentErrorCode.invalid);
         }
     }
 
     public static void printConsoleHelp(ArgumentErrorCode code) {
         switch (code) {
-            case filename:
-                System.out.println("ERROR: FILE NAME MISSING");
-                break;
-            case missingAll:
-                System.out.println("ERROR: MISSING ARGUMENTS");
-                break;
-            case startByte:
-                System.out.println("ERROR: START BYTE VALUE MISSING");
-                break;
-            case endByte:
-                System.out.println("ERROR: END BYTE VALUE MISSING");
-                break;
-            case startByteIndexLessThan1:
-                System.out.println("ERROR: START BYTE INDEX MUST BE GREATER THAN 0");
-                break;
-            case endByteIndexLessThan1:
-                System.out.println("ERROR: END BYTE INDEX MUST BE GREATER THAN 0");
-                break;
-            case startIndexAfterEnd:
-                System.out.println("ERROR: END BYTE INDEX CANNOT BE LESS THAN START BYTE INDEX");
-                break;
-            default:
-                System.out.println("ERROR: INVALID ARGUMENT");
-                break;
+        case filename:
+            System.out.println("ERROR: FILE NAME MISSING");
+            break;
+        case serverName:
+            System.out.println("ERROR: SERVER NAME MISSING");
+            break;
+        case missingAll:
+            System.out.println("ERROR: MISSING ARGUMENTS");
+            break;
+        case startByte:
+            System.out.println("ERROR: START BYTE VALUE MISSING");
+            break;
+        case endByte:
+            System.out.println("ERROR: END BYTE VALUE MISSING");
+            break;
+        case startByteIndexLessThan1:
+            System.out.println("ERROR: START BYTE INDEX MUST BE GREATER THAN 0");
+            break;
+        case endByteIndexLessThan1:
+            System.out.println("ERROR: END BYTE INDEX MUST BE GREATER THAN 0");
+            break;
+        case startIndexAfterEnd:
+            System.out.println("ERROR: END BYTE INDEX CANNOT BE LESS THAN START BYTE INDEX");
+            break;
+        case invalidStartByteNumberParseFormat:
+            System.out.println(
+                    "ERROR: CANNOT PARSE START BYTE INDEX. VALUE IS NOT A NUMBER OR NUMBER IS LARGER THAN LONG.MAX_VALUE");
+            break;
+        case invalidEndByteNumberParseFormat:
+            System.out.println(
+                    "ERROR: CANNOT PARSE END BYTE INDEX. VALUE IS NOT A NUMBER OR NUMBER IS LARGER THAN LONG.MAX_VALUE");
+            break;
+        default:
+            System.out.println("ERROR: INVALID ARGUMENT");
+            break;
         }
 
         System.out.println();
         System.out.println("Please use as follows:");
         System.out.println();
-        System.out.println("  `java Client [-w] <filename> [-s <startByteIndex> -e <endByteIndex>]`");
+        System.out.println("  `java Client <serverName> [-w] <filename> [-s <startByteIndex> -e <endByteIndex>]`");
         System.out.println();
         System.out.println("  ============================================================");
         System.out.println();
+        System.out.println("  <serverName> : Required whether reading or writting file");
         System.out.println("  <filename> : Required whether reading or writting file");
+        System.out.println("  <startByteIndex> : Must be greater than 0 and less than <endByteIndex>");
+        System.out.println("  <endByteIndex> : Must be greater than <startByteIndex> and less than Long.MAX_VALUE");
         System.out.println();
         System.out.println("  -w : Sets Client in write mode. File with <filename> will upload to Server.");
         System.out.println("       File to upload must be in Files/ directory of Client");
         System.out.println();
-        System.out.println("  Download only:");
         System.out.println("  -s : Sets the start byte index to copy file (if whole file is not needed)");
         System.out.println("  -e : Sets the end byte index to copy file (if whole file is not needed)");
         System.out.println();
@@ -264,8 +325,8 @@ class InvalidArgumentException extends Exception {
 }
 
 enum ArgumentErrorCode {
-    filename, startByte, endByte, missingAll, startIndexAfterEnd, startByteIndexLessThan1, endByteIndexLessThan1,
-    invalid
+    serverName, filename, startByte, endByte, missingAll, startIndexAfterEnd, startByteIndexLessThan1,
+    endByteIndexLessThan1, invalid, invalidStartByteNumberParseFormat, invalidEndByteNumberParseFormat
 }
 
 enum ClientMode {

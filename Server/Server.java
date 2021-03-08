@@ -10,6 +10,10 @@ public class Server {
     private ExecutorService executorService;
 
     public Server(int port, int debugFlag) {
+        if (debugFlag == 1) {
+            System.out.println("Server running on port: " + port);
+        }
+
         executorService = Executors.newCachedThreadPool();
 
         try {
@@ -36,7 +40,7 @@ public class Server {
             int debugFlag = parseCommandLineArgument(args);
             Server server = new Server(5000, debugFlag);
         } catch (InvalidArgumentException e) {
-            System.out.println("ERROR: INVALID ARGUMENTS");
+            System.out.println(e.getMessage().isEmpty() ? "ERROR: INVALID ARGUMENTS" : e.getMessage());
             System.out.println();
             System.out.println("Please run as:");
             System.out.println();
@@ -58,12 +62,40 @@ public class Server {
             throw new InvalidArgumentException();
         }
 
-        int debugFlag = args.length > 0 ? Integer.parseInt(splitByEqual[1]) : 0;
+        int debugFlag = 0;
+
+        try {
+            int parsedDebugFlag = Integer.parseInt(splitByEqual[1]);
+
+            if (parsedDebugFlag != 0 && parsedDebugFlag != 1) {
+                throw new NumberFormatException();
+            }
+
+            debugFlag = parsedDebugFlag;
+        } catch (NumberFormatException e) {
+            throw new InvalidArgumentException(
+                    "ERROR: CANNOT PARSE DEBUG ARGUMENT. IS NOT EQUAL TO 0 OR 1, OR IT'S NOT A NUMBER");
+        }
+
         return debugFlag;
     }
 }
 
 class InvalidArgumentException extends Exception {
+    private String message;
+
+    public InvalidArgumentException() {
+        this("");
+    }
+
+    public InvalidArgumentException(String message) {
+        this.message = message;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
     private static final long serialVersionUID = 1L;
 }
 
@@ -97,16 +129,16 @@ class ConnectionManager implements Runnable {
                 String request = socketIn.readLine(); // Now you get GET index.html HTTP/1.1
 
                 if (request.trim().length() == 1) {
-                    clientMode = request.contains("0") ? 0 : 1;
+                    clientMode = request.trim().equals("1") ? 1 : 0;
                     socketOut = new DataOutputStream(connection.getOutputStream()); // Write data to client
                     processClientRequest(debugFlag);
+                    System.out.println();
                 } else {
                     String[] requestParam = request.split(" ");
                     String path = requestParam[1];
                     processHTTPGetRequest(path);
+                    System.out.println();
                 }
-
-                System.out.println();
             } catch (Exception e) {
                 System.out.println("ERROR: Error in ConnectionManager. " + e);
             } finally {
@@ -154,7 +186,7 @@ class ConnectionManager implements Runnable {
         long lengthOfBytesToRead = endByteIndex - skipItems;
         fileIn = new FileInputStream(fileInFiles);
         fileIn.skip(skipItems);
-        long totalFileByteSize = fileIn.available();
+        long totalFileByteSize = fileInFiles.length();
 
         if (endByteIndex > 0) {
             if (totalFileByteSize >= lengthOfBytesToRead) {
@@ -179,10 +211,11 @@ class ConnectionManager implements Runnable {
             }
 
             bytes = fileIn.read(buffer, 0, bufferSize); // Read from file
-            totalBytesTransferred += bytes;
 
             if (bytes <= 0)
                 break; // Check for end of file
+
+            totalBytesTransferred += bytes;
 
             socketOut.write(buffer, 0, bytes); // Write bytes to socket
             printTransferProgress(totalFileByteSize, totalFileByteSize - totalBytesTransferred);
@@ -295,6 +328,5 @@ class ConnectionManager implements Runnable {
         }
 
         percentageTransferred = roundedPercentage;
-
     }
 }
