@@ -168,7 +168,7 @@ public class Client {
     public static void main(String[] args) {
         try {
             parseCommandLineArguments(args);
-            Client client = new Client(serverName, 5000, filename);
+            Client client = new Client(serverName, 2296, filename);
         } catch (InvalidArgumentException e) {
             printConsoleHelp(e.getCode());
         }

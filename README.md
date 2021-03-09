@@ -1,3 +1,6 @@
+# NOTE
+Ports are currently set as 2296 for both Client and Server. You can adjust this by going into Server.java and Client.java and changing the port number in the main method.
+
 # ClientServer
 A client server project example written in Java.
 

@@ -38,7 +38,7 @@ public class Server {
     public static void main(String[] args) {
         try {
             int debugFlag = parseCommandLineArgument(args);
-            Server server = new Server(5000, debugFlag);
+            Server server = new Server(2296, debugFlag);
         } catch (InvalidArgumentException e) {
             System.out.println(e.getMessage().isEmpty() ? "ERROR: INVALID ARGUMENTS" : e.getMessage());
             System.out.println();
