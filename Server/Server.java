@@ -5,8 +5,9 @@ import java.net.Socket;
 import java.util.concurrent.*;
 
 // PLEASE ADJUST PORT NUMBER HERE AS NEEDED
+// MAKE SURE CLIENT MATCHES THIS PORT
 class Port {
-    public static int port = 2296;
+    public static int port = 2296; // CHANGE THIS PORT AS NEEDED
 }
 
 public class Server {

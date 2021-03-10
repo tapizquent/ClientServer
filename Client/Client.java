@@ -5,8 +5,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+// PLEASE ADJUST PORT NUMBER HERE AS NEEDED
+// MAKE SURE SERVER MATCHES THIS PORT
 class Port {
-    public static int port = 2296;
+    public static int port = 2296; // CHANGE THIS PORT AS NEEDED
 }
 
 public class Client {
