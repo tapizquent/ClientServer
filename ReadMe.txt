@@ -1,3 +1,6 @@
+# NOTE
+Ports are currently set as 2296 for both Client and Server. You can adjust this by going into both Server.java and Client.java and changing the port number in the class Port.
+
 # ClientServer
 A client server project example written in Java.
 
@@ -16,15 +19,15 @@ from the Tapizquent_Jose directory
 
 Once the executables have been generated, `cd` into the `Server/` directory and run
     `java Server` or `java Server DEBUG=1`
-from the Server directory to start the Server at port 5000
+from the Server directory to start the Server at port 2296
 
 Once the server is running, the Client can be run to upload or download files from the Server.
 To do this, `cd` into `Client/` directory and run
-    `java Client <filename>` or `java Client -w <filename>`
+    `java Client <serverName> <filename>` or `java Client -w <filename>`
 from the Client directory
 
 You can also run client as
-    `java Client <filename> -s <startByteIndex> -e <endByteIndex>` or `java Client -w <filename> -s <startByteIndex> -e <endByteIndex>`
+    `java Client <serverName> <filename> -s <startByteIndex> -e <endByteIndex>` or `java Client -w <filename> -s <startByteIndex> -e <endByteIndex>`
 To only read or write files on a specify range of bytes only, if the whole file is not needed.
 
 # IMPORTANT REMARKS:

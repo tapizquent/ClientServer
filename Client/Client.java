@@ -5,6 +5,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+class Port {
+    public static int port = 2296;
+}
+
 public class Client {
     private final int BUFFER_SIZE = 4096;
     private Socket connection;
@@ -19,7 +23,10 @@ public class Client {
     private static long endByteIndex = -1;
     private static String serverName = "";
 
-    public Client(String host, int port, String filename) {
+    public Client() {
+    }
+
+    public void start(String host, int port, String filename) {
         try {
             if (clientMode == ClientMode.write) {
                 processUpload(host, port, filename);
@@ -105,6 +112,20 @@ public class Client {
                 return;
             }
 
+            long skipItems = startByteIndex < 0 ? 0 : startByteIndex - 1;
+            long lengthOfBytesToRead = endByteIndex - skipItems;
+
+            long totalFileByteSize = fileToUpload.length();
+
+            if (endByteIndex > 0) {
+                if (totalFileByteSize >= lengthOfBytesToRead) {
+                    totalFileByteSize = lengthOfBytesToRead;
+                } else {
+                    System.out.println("** Invalid byte range specified");
+                    return;
+                }
+            }
+
             establishConnection(host, port);
 
             socketOut.writeUTF("1\n");
@@ -117,23 +138,8 @@ public class Client {
                 return;
             }
 
-            long skipItems = startByteIndex < 0 ? 0 : startByteIndex - 1;
-            long lengthOfBytesToRead = endByteIndex - skipItems;
-
-            FileInputStream fileInputStream = new FileInputStream(fileToUpload);
-            long totalFileByteSize = fileToUpload.length();
-
-            if (endByteIndex > 0) {
-                if (totalFileByteSize >= lengthOfBytesToRead) {
-                    totalFileByteSize = lengthOfBytesToRead;
-                } else {
-                    System.out.println("** Invalid byte range specified");
-                    fileInputStream.close();
-                    return;
-                }
-            }
-
             long totalBytesTransferred = 0;
+            FileInputStream fileInputStream = new FileInputStream(fileToUpload);
 
             fileInputStream.skip(skipItems);
 
@@ -168,7 +174,8 @@ public class Client {
     public static void main(String[] args) {
         try {
             parseCommandLineArguments(args);
-            Client client = new Client(serverName, 2296, filename);
+            Client client = new Client();
+            client.start(serverName, Port.port, filename);
         } catch (InvalidArgumentException e) {
             printConsoleHelp(e.getCode());
         }

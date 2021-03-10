@@ -4,12 +4,20 @@ import java.nio.charset.StandardCharsets;
 import java.net.Socket;
 import java.util.concurrent.*;
 
+// PLEASE ADJUST PORT NUMBER HERE AS NEEDED
+class Port {
+    public static int port = 2296;
+}
+
 public class Server {
     private Socket connection;
     private ServerSocket socket;
     private ExecutorService executorService;
 
-    public Server(int port, int debugFlag) {
+    public Server() {
+    }
+
+    public void start(int port, int debugFlag) {
         if (debugFlag == 1) {
             System.out.println("Server running on port: " + port);
         }
@@ -38,7 +46,8 @@ public class Server {
     public static void main(String[] args) {
         try {
             int debugFlag = parseCommandLineArgument(args);
-            Server server = new Server(2296, debugFlag);
+            Server server = new Server();
+            server.start(Port.port, debugFlag);
         } catch (InvalidArgumentException e) {
             System.out.println(e.getMessage().isEmpty() ? "ERROR: INVALID ARGUMENTS" : e.getMessage());
             System.out.println();
